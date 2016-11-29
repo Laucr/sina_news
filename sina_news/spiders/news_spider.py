@@ -69,7 +69,7 @@ class SinaNewsSpider(scrapy.spiders.Spider):
         sel = scrapy.Selector(response)
         item = {
             'title': response.meta['title'],
-            'intro': sel.xpath('//*[@id="link-report"]/div[1]/div/p/text()').extract()[0].encode('utf8'),
+            'article': sel.xpath('//*[@id="artibody"]/p[1]/text()').extract()[0].encode('utf8'),
             'category': response.meta['category']
         }
         yield item

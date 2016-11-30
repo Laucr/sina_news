@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 # __author__ = "Lau"
 
-import random
 import sys
-import urllib
-
 import scrapy
+import execjs
 
 sys.path.append('..')
 
@@ -18,10 +16,10 @@ class SinaNewsSpider(scrapy.spiders.Spider):
         super(SinaNewsSpider, self).__init__(name, **kwargs)
 
     name = 'sina'
-    allowed_domains = ['news.sina.com.cn']
+    allowed_domains = ['sina.com.cn']
     start_urls = [
-        'http://roll.news.sina.com.cn/s/'
-        'channel.php?ch=01#col=89&spec=&type=&ch=01&k=&offset_page=0&offset_num=0&num=80&asc=&page=',
+        'http://roll.news.sina.com.cn/interface/rollnews_ch_out_interface.php?col=89&spec=&type=&ch=01&k=&offset_page=0'
+        '&offset_num=0&num=5&asc=&r=0.9433961449038644&page='
     ]
 
     user_agents = [
@@ -40,36 +38,39 @@ class SinaNewsSpider(scrapy.spiders.Spider):
     def start_requests(self):
 
         for a_url in self.start_urls:
-            pages = range(1, 200)
-            for page in pages:
-                yield scrapy.Request(url=(a_url + str(page)),
-                                     headers={
-                                         "User-Agent": self.user_agents[random.randint(0, len(self.user_agents) - 1)]})
+            # pages = range(1, 2)
+            # for page in pages:
+            yield scrapy.Request(url=(a_url + str(1)),
+                                 headers={
+                                     # "User-Agent": self.user_agents[random.randint(0, len(self.user_agents) - 1)]}
+                                     "User-Agent": self.user_agents[0]}
+                                 )
 
     # OVERRIDE
     def parse(self, response):
-        item_size = 80
+        item_counter = 5
+        json_data = response.body[14:-1].decode('gbk')
+        news_info = execjs.eval(json_data)
         # I love this line XD
-        _items = [
-            {
-                'title': [a_title.extract() for a_title in response.xpath('//div[@class="info"]/h2/a/@title')][_iter],
-                '_id': [a_id.extract() for a_id in response.xpath('//div[@class="info"]/h2/a/@href')][_iter]
-            } for _iter in range(item_size)
-            ]
+        _items = [{
+                      'title': news_info['list'][_iter]['title'].encode('utf8'),
+                      'category': news_info['list'][_iter]['channel']['title'].encode('utf8'),
+                      'href': news_info['list'][_iter]['url']
+                  } for _iter in range(item_counter)]
 
         for _a_item in _items:
-            yield scrapy.http.Request(url=_a_item['_id'].encode('utf8'),
-                                      headers={
-                                          "User-Agent": self.user_agents[random.randint(0, len(self.user_agents) - 1)]},
-                                      meta={'title': _a_item['title'].encode('utf8'),
-                                            'category': urllib.unquote(response.url.split('/')[-1].split('?')[0])},
+            yield scrapy.http.Request(url=_a_item['href'],
+                                      meta={'title': _a_item['title'],
+                                            'category': _a_item['category'],
+                                            'href': _a_item['href']},
                                       callback=self.parse_secondary_link)
 
     def parse_secondary_link(self, response):
         sel = scrapy.Selector(response)
         item = {
             'title': response.meta['title'],
-            'article': sel.xpath('//*[@id="artibody"]/p[1]/text()').extract()[0].encode('utf8'),
+            'article': sel.xpath('//*[@id="artibody"]/p/text()').extract(),
+            'href': response.meta['href'],
             'category': response.meta['category']
         }
         yield item

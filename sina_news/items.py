@@ -14,4 +14,4 @@ class DoubanItem(scrapy.Item):
     title = scrapy.Field()
     article = scrapy.Field()
     category = scrapy.Field()
-    _id = scrapy.Field()
+    href = scrapy.Field()
